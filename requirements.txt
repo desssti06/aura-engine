@@ -1,47 +1,43 @@
-# RAG Auto-Grading System Requirements
-# Install with: pip install -r requirements.txt
-
-# Core ML/AI Libraries
+# --- Core ML/AI Libraries ---
 torch>=2.0.0
 sentence-transformers>=2.2.0
 transformers>=4.30.0
 faiss-cpu>=1.7.4
 
-# LangChain
+# --- LangChain Framework ---
 langchain>=0.1.0
 langchain-core>=0.1.0
 langchain-text-splitters>=0.0.1
 
-# PDF Processing
+# --- PDF Processing ---
 PyPDF2>=3.0.0
-pdfplumber>=0.9.0  # Alternative PDF parser untuk OCR
+pdfplumber>=0.9.0  # Alternative PDF parser for OCR
 
-# Data Processing
+# --- Data Processing ---
 pandas>=2.0.0
 numpy>=1.24.0
 openpyxl>=3.1.0  # Excel support
 
-# API & Networking
+# --- API & Networking ---
 requests>=2.31.0
 httpx>=0.24.0
 
-# Utilities
+# --- Utilities ---
 tqdm>=4.65.0
 python-dotenv>=1.0.0
 pydantic>=2.0.0
 
-# Optional: Visualization
+# --- Visualization (Optional) ---
 matplotlib>=3.7.0
 seaborn>=0.12.0
-plotly>=5.14.0
+plotly>=5.17.0
 
-# Optional: Advanced PDF processing
-pytesseract>=0.3.10  # OCR capability
+# --- Advanced PDF / OCR (Optional) ---
+pytesseract>=0.3.10
 Pillow>=10.0.0
 
-# Optional: Database
+# --- Database (Optional) ---
 sqlalchemy>=2.0.0
 
-# Web Interface
+# --- Web Interface ---
 streamlit>=1.28.0
-plotly>=5.17.0
