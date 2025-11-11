@@ -98,25 +98,3 @@ Hasil run batch akan disimpan di `output/` (jika script menyimpan hasil) dan/ata
 File contoh `data/rubrik.json` berisi struktur kriteria yang digunakan oleh `GradingEngine`. Pastikan rubrik dikirim ke `index.py` sebagai objek JSON pada field `rubric`.
 
 ---
-
-## Catatan Penting
-
-- README sebelumnya menyebut `api.py` dan FastAPI — file tersebut tidak ada di repositori ini. Entrypoint saat ini adalah `index.py` untuk CLI, dan `rag_grading_improved.py` sebagai modul engine.
-- Periksa `requirements.txt` dan sesuaikan environment Anda. Beberapa dependensi (mis. `faiss-cpu`) mungkin membutuhkan instalasi platform-spesifik.
-- Jika Anda ingin expose sebagai API (FastAPI/uvicorn), saya bisa bantu menambahkan wrapper `api.py` dan endpointnya.
-
----
-
-## Pengembangan dan kontribusi
-
-- Untuk menambahkan fitur atau memperbaiki bug, buat branch baru, kerjakan perubahan, dan buka PR ke branch `main`.
-- Sertakan contoh input dan output saat menambahkan perubahan pada `GradingEngine`.
-
----
-
-Jika ingin, saya bisa:
-
-1. Tambahkan file `api.py` (FastAPI) untuk expose endpoint HTTP.
-2. Tambahkan contoh input JSON lengkap di `data/examples/` dan script kecil untuk pengujian.
-
-Beritahu saya mana yang ingin Anda lakukan selanjutnya.
