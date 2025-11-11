@@ -1,158 +1,122 @@
-# 🤖 Auto Grading API v1
+# 🤖 Aura Engine — AI Auto Grading (RAG)
 
-Sistem penilaian otomatis berbasis **Retrieval-Augmented Generation (RAG)** untuk menilai dokumen tugas mahasiswa berdasarkan **rubrik JSON**.  
-Aplikasi ini dibangun menggunakan **FastAPI** dan mendukung model **Gemini** serta **OpenRouter (LLM API)**.
+This repository berisi engine penilaian otomatis berbasis Retrieval-Augmented Generation (RAG) untuk menilai tugas mahasiswa (PDF) berdasarkan rubrik JSON.
 
----
-
-## 🚀 Fitur Utama
-
-- 📄 Ekstraksi teks dan metadata dari file PDF.
-- 🧠 Pemrosesan teks menggunakan **SentenceTransformer + FAISS** untuk pencarian semantik.
-- 🧩 Penilaian otomatis dengan **rubrik berbasis JSON**.
-- 🌐 Integrasi API dengan **Gemini** atau **OpenRouter** (pilih sesuai ketersediaan API key).
-- ⚙️ Logging terpusat dan konfigurasi fleksibel via `.env`.
+README ini diperbarui agar sesuai dengan isi repositori: entrypoint CLI `index.py` dan engine `rag_grading_improved.py`.
 
 ---
 
-## 📁 Struktur Proyek
+## Ringkasan
+
+- Input: file PDF tugas dan rubrik (JSON).
+- Proses: ekstraksi teks dari PDF → pembuatan index embedding (FAISS) → retrieval → prompt ke LLM untuk penilaian per kriteria.
+- Output: struktur JSON `advancedgradingdata` berisi hasil penilaian dan catatan.
+
+---
+
+## Struktur Proyek (ringkas)
 
 ```
 .
-├── api.py                    # FastAPI endpoint utama
-├── rag_grading_improved.py   # Engine utama RAG dan penilaian
-├── data/
-│   ├── rubrik.json           # Contoh rubrik penilaian
-│   └── *.pdf                 # File tugas yang akan dinilai
-├── output/                   # Hasil grading batch (opsional)
-└── requirements.txt
+├── index.py                   # Entrypoint CLI untuk memproses satu tugas lewat JSON input
+├── rag_grading_improved.py    # Engine RAG, ekstraktor PDF, dan grading engine
+├── evaluation_metrics.py      # Utility evaluasi/metric
+├── data/                      # Contoh rubrik dan (opsional) PDF untuk batch
+│   └── rubrik.json
+├── output/                    # Hasil run batch akan disimpan di sini
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
-## 🧰 Instalasi dan Setup
+## Prasyarat
 
-### 1️⃣ Clone Repository
-```bash
-git clone https://github.com/aura-capstone-project/<nama-repo>.git
-cd <nama-repo>
-```
+- Python 3.8+
+- Sistem operasi: Windows (instruksi PowerShell disediakan), Linux/Mac juga kompatibel dengan penyesuaian aktivasi venv.
 
-### 2️⃣ Buat Virtual Environment
-```bash
+---
+
+## Instalasi (Windows PowerShell)
+
+1. Buat dan aktifkan virtual environment:
+
+```powershell
 python -m venv venv
-source venv/bin/activate   # (Linux/Mac)
-venv\Scripts\activate     # (Windows)
+venv\Scripts\Activate.ps1
 ```
 
-### 3️⃣ Instal Dependensi
-```bash
+2. Instal dependensi:
+
+```powershell
 pip install -r requirements.txt
 ```
 
-### 4️⃣ Siapkan `.env`
-Contoh isi:
-```bash
-GEMINI_API_KEY=your_gemini_api_key
+3. (Opsional) Salin contoh `.env` dan set nilai API/konfigurasi jika diperlukan.
+
+Contoh variabel di `.env`:
+
+```text
+GEMINI_API_KEY=
 OPENROUTER_KEY=
-MODEL=google/gemini-2.0-flash
+MODEL=
 EMBEDDING_MODEL=all-MiniLM-L6-v2
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
 TOP_K_RETRIEVAL=5
 ```
 
+Catatan: `index.py` saat ini menambahkan token query statis ke URL (lihat source) — pastikan URL berformat dapat diunduh dari mesin Anda.
+
 ---
 
- ## ⚙️ Menjalankan API Server
+## Cara Menjalankan
 
-Jalankan server FastAPI:
-```bash
-uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+1) Mode CLI (satu tugas)
+
+`index.py` menerima argumen `--input` berupa string JSON. Contoh (PowerShell):
+
+```powershell
+$json = '{"userId":"U123","assignmentId":"A001","assignmentUrl":"https://example.com/tugas.pdf","rubric": {"criteria": []}}'
+python index.py --input $json
 ```
 
-Buka dokumentasi API:
-👉 [http://localhost:8000/docs](http://localhost:8000/docs)
+Respons JSON akan dicetak ke stdout.
 
----
+2) Mode Batch (semua file di folder `data/`)
 
-## 📤 Endpoint Utama
-
-### `POST /api/v1/grade`
-
-
-
-**Deskripsi:**  
-Melakukan penilaian otomatis terhadap file PDF berdasarkan rubrik JSON.
-
-**Form Data:**
-| Parameter | Type | Deskripsi |
-|------------|------|-----------|
-| `assignment_id` | string | ID tugas |
-| `user_id` | string | ID pengguna |
-| `rubric` | file (.json) | File rubrik penilaian |
-| `tugas` | file (.pdf) | File PDF tugas mahasiswa |
-
-**Contoh Respons:**
-```json
-{
-  "assignment_id": "A001",
-  "user_id": "U123",
-  "advancedgradingdata": {
-    "rubric": {
-      "criteria": [
-        {
-          "criterionid": 1,
-          "fillings": [
-            {
-              "criterionid": 1,
-              "levelid": 3,
-              "remark": "Penjelasan hasil dan skor",
-              "confidence": 0.87
-            }
-          ]
-        }
-      ]
-    }
-  }
-}
-```
-
----
-
-## 🧠 Arsitektur Sistem
-
-```mermaid
-flowchart TD
-    A[Upload Rubric + Tugas PDF] --> B[PDFExtractor]
-    B --> C[RAGEngine - FAISS Index]
-    C --> D[GradingEngine - LLM Call]
-    D --> E[JSON Output: advancedgradingdata]
-```
-
----
-
-## 🧪 Mode Batch (CLI)
-
-Selain API, sistem ini dapat menjalankan penilaian seluruh PDF di folder `data/`:
-
-```bash
+```powershell
 python rag_grading_improved.py
 ```
 
-Hasil akan ditampilkan langsung di terminal dan disimpan dalam `output/`.
+Hasil run batch akan disimpan di `output/` (jika script menyimpan hasil) dan/atau dicetak ke terminal.
 
 ---
 
-## 🧩 Dependensi Utama
+## Format Rubrik
 
-- fastapi
-- uvicorn
-- PyPDF2
-- faiss-cpu
-- sentence-transformers
-- langchain-text-splitters
-- tqdm
-- requests
-- dotenv
+File contoh `data/rubrik.json` berisi struktur kriteria yang digunakan oleh `GradingEngine`. Pastikan rubrik dikirim ke `index.py` sebagai objek JSON pada field `rubric`.
+
 ---
+
+## Catatan Penting
+
+- README sebelumnya menyebut `api.py` dan FastAPI — file tersebut tidak ada di repositori ini. Entrypoint saat ini adalah `index.py` untuk CLI, dan `rag_grading_improved.py` sebagai modul engine.
+- Periksa `requirements.txt` dan sesuaikan environment Anda. Beberapa dependensi (mis. `faiss-cpu`) mungkin membutuhkan instalasi platform-spesifik.
+- Jika Anda ingin expose sebagai API (FastAPI/uvicorn), saya bisa bantu menambahkan wrapper `api.py` dan endpointnya.
+
+---
+
+## Pengembangan dan kontribusi
+
+- Untuk menambahkan fitur atau memperbaiki bug, buat branch baru, kerjakan perubahan, dan buka PR ke branch `main`.
+- Sertakan contoh input dan output saat menambahkan perubahan pada `GradingEngine`.
+
+---
+
+Jika ingin, saya bisa:
+
+1. Tambahkan file `api.py` (FastAPI) untuk expose endpoint HTTP.
+2. Tambahkan contoh input JSON lengkap di `data/examples/` dan script kecil untuk pengujian.
+
+Beritahu saya mana yang ingin Anda lakukan selanjutnya.
