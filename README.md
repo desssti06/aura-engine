@@ -42,7 +42,7 @@ cd <nama-repo>
 ```bash
 python -m venv venv
 source venv/bin/activate   # (Linux/Mac)
-venv\Scripts\activate      # (Windows)
+venv\Scripts\activate     # (Windows)
 ```
 
 ### 3️⃣ Instal Dependensi
@@ -64,7 +64,7 @@ TOP_K_RETRIEVAL=5
 
 ---
 
-## ⚙️ Menjalankan API Server
+ ## ⚙️ Menjalankan API Server
 
 Jalankan server FastAPI:
 ```bash
@@ -79,6 +79,8 @@ Buka dokumentasi API:
 ## 📤 Endpoint Utama
 
 ### `POST /api/v1/grade`
+
+
 
 **Deskripsi:**  
 Melakukan penilaian otomatis terhadap file PDF berdasarkan rubrik JSON.
