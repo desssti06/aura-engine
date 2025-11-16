@@ -1,15 +1,27 @@
 import argparse
 import json
 import tempfile
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
 import httpx
 
-from rag_grading_improved import PDFExtractor, RAGEngine, GradingEngine, Config
+from rag_grading_improved2 import PDFExtractor, RAGEngine, GradingEngine, Config
+
+
+def _append_query_param(url: str, key: str, value: str) -> str:
+    parsed = urlparse(url)
+    params = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    params[key] = value
+    new_query = urlencode(params, doseq=True)
+    return urlunparse(parsed._replace(query=new_query))
 
 
 def process_grading(assignment_id: str, user_id: str, assignment_url: str, rubric_data: dict):
-    # Tambah token via query parameter
-    token = "0f087ba729c44eb31235146842c67101"
-    file_url = f"{assignment_url}?token={token}"
+    token = Config.MOODLE_DOWNLOAD_TOKEN
+    if not token:
+        return {"error": "Environment variable MOODLE_DOWNLOAD_TOKEN is not set."}
+
+    file_url = _append_query_param(assignment_url, "token", token)
 
     # 1. Unduh PDF
     try:
@@ -46,11 +58,22 @@ def process_grading(assignment_id: str, user_id: str, assignment_url: str, rubri
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AI Auto Grading CLI")
-    parser.add_argument("--input", required=True, help="JSON input string")
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("--input", help="JSON input string")
+    input_group.add_argument("--input-file", help="Path ke file JSON input")
     args = parser.parse_args()
 
+    raw_payload = args.input
+    if args.input_file:
+        try:
+            with open(args.input_file, "r", encoding="utf-8") as fh:
+                raw_payload = fh.read()
+        except Exception as e:
+            print(json.dumps({"error": f"Gagal membaca file input: {e}"}))
+            exit(1)
+
     try:
-        data = json.loads(args.input)
+        data = json.loads(raw_payload)
     except Exception as e:
         print(json.dumps({"error": f"Gagal parsing input JSON: {e}"}))
         exit(1)

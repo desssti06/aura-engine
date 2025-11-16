@@ -203,9 +203,12 @@ Hanya keluarkan JSON, tanpa teks tambahan.
                 resp.raise_for_status()
                 data = resp.json()
 
+                # debug logging agar tahu isi respons mentah
+                logging.debug(f"Raw Gemini response: {json.dumps(data, indent=2)}")
+
                 candidates = data.get("candidates", [])
                 if not candidates:
-                    raise ValueError("Response Gemini kosong.")
+                    raise ValueError("Response Gemini kosong / tidak berisi kandidat output.")
                 return candidates[0]["content"]["parts"][0].get("text", "{}")
 
             elif self.config.OPENROUTER_KEY:
@@ -224,7 +227,7 @@ Hanya keluarkan JSON, tanpa teks tambahan.
                 return data["choices"][0]["message"]["content"]
 
             else:
-                raise ValueError("Tidak ada API key.")
+                raise ValueError("Tidak ada API key yang ditemukan.")
 
         except Exception as e:
             logging.error(f"LLM call failed: {e}")
@@ -233,7 +236,7 @@ Hanya keluarkan JSON, tanpa teks tambahan.
     def _parse_response(self, response: str) -> Dict:
         try:
             if not response or response.strip() == "{}":
-                logging.warning("Response kosong dari LLM.")
+                logging.warning("Response kosong dari LLM, menggunakan fallback default.")
                 return {
                     "advancedgradingdata": {
                         "rubric": {
@@ -244,7 +247,7 @@ Hanya keluarkan JSON, tanpa teks tambahan.
                                         {
                                             "criterionid": 0,
                                             "levelid": 0,
-                                            "remark": "LLM tidak mengembalikan hasil.",
+                                            "remark": "LLM tidak mengembalikan hasil penilaian. Gunakan fallback.",
                                             "confidence": 0.0,
                                         }
                                     ],
@@ -257,11 +260,13 @@ Hanya keluarkan JSON, tanpa teks tambahan.
             if "```" in response:
                 response = response.split("```")[1].replace("json", "").strip()
 
+
             data = json.loads(response.strip())
             return data
 
         except json.JSONDecodeError as e:
             logging.error(f"Error parsing LLM response: {e}")
+            logging.debug(f"Raw response:\n{response}")
             return {
                 "advancedgradingdata": {
                     "rubric": {
@@ -272,7 +277,7 @@ Hanya keluarkan JSON, tanpa teks tambahan.
                                     {
                                         "criterionid": 0,
                                         "levelid": 0,
-                                        "remark": f"JSON tidak valid: {e}",
+                                        "remark": f"Response tidak bisa diparse sebagai JSON. Error: {e}",
                                         "confidence": 0.0,
                                     }
                                 ],
@@ -295,22 +300,17 @@ class BatchProcessor:
     def process_folder(self, folder_path: str, rubric_path: str) -> List[Dict]:
         with open(rubric_path, "r", encoding="utf-8") as f:
             rubric_data = json.load(f)
-
         pdf_files = list(Path(folder_path).glob("*.pdf"))
         results = []
-
         for pdf_file in tqdm(pdf_files, desc="Processing PDFs"):
             extracted = self.pdf_extractor.extract_text_with_metadata(str(pdf_file))
             if not extracted:
                 continue
-
             rag_engine = RAGEngine()
             rag_engine.build_index(extracted["text"])
-
             grading_result = self.grading_engine.grade_document(rag_engine, rubric_data)
             grading_result["document_info"] = extracted
             results.append(grading_result)
-
         return results
 
 
@@ -336,19 +336,8 @@ def main():
         print(f"\n📘 Dokumen #{i}: {result.get('document_info', {}).get('filename', 'Unknown')}")
         print(json.dumps(result, indent=2, ensure_ascii=False))
 
-    # ==========================================================
-    # SIMPAN KE JSON
-    # ==========================================================
-    os.makedirs(Config.OUTPUT_FOLDER, exist_ok=True)
-    output_path = os.path.join(Config.OUTPUT_FOLDER, "hasil_grading.json")
-
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
-
-    print(f"\n💾 Hasil grading disimpan ke: {output_path}")
-
     print("\n" + "=" * 80)
-    print("✅ Semua hasil grading sudah ditampilkan & disimpan.")
+    print("✅ Semua hasil grading sudah ditampilkan di terminal.")
     print("=" * 80)
 
 

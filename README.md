@@ -39,6 +39,15 @@ README ini diperbarui agar sesuai dengan isi repositori: entrypoint CLI `index.p
 
 ## Instalasi (Windows PowerShell)
 
+### Opsi A — Astral uv (disarankan)
+
+1. Instal uv (sekali saja): `pip install uv`
+2. Buat virtual environment: `uv venv`
+3. Aktifkan: `.venv\Scripts\Activate.ps1`
+4. Instal dependensi: `uv pip install -r requirements.txt`
+
+### Opsi B — Python venv + pip
+
 1. Buat dan aktifkan virtual environment:
 
 ```powershell
@@ -52,27 +61,28 @@ venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-3. (Opsional) Salin contoh `.env` dan set nilai API/konfigurasi jika diperlukan.
+3. Salin `.env.example` ke `.env` dan isi nilai API/konfigurasi.
 
 Contoh variabel di `.env`:
 
 ```text
 GEMINI_API_KEY=
 OPENROUTER_KEY=
-MODEL=
+MOODLE_DOWNLOAD_TOKEN=
+MODEL=google/gemini-2.0-flash
 EMBEDDING_MODEL=all-MiniLM-L6-v2
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
 TOP_K_RETRIEVAL=5
 ```
 
-Catatan: `index.py` saat ini menambahkan token query statis ke URL (lihat source) — pastikan URL berformat dapat diunduh dari mesin Anda.
+Catatan: `index.py` kini membaca token Moodle dari `.env` (variabel `MOODLE_DOWNLOAD_TOKEN`).
 
 ---
 
 ## Cara Menjalankan
 
-1) Mode CLI (satu tugas)
+1. Mode CLI (satu tugas)
 
 `index.py` menerima argumen `--input` berupa string JSON. Contoh (PowerShell):
 
@@ -83,7 +93,7 @@ python index.py --input $json
 
 Respons JSON akan dicetak ke stdout.
 
-2) Mode Batch (semua file di folder `data/`)
+2. Mode Batch (semua file di folder `data/`)
 
 ```powershell
 python rag_grading_improved.py

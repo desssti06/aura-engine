@@ -1,0 +1,101 @@
+{
+  "userId": "1121033",
+  "assignmentId": "01",
+  "assignmentUrl": "https://moodle.pahril.web.id/webservice/pluginfile.php/25/assignsubmission_file/submission_files/9/Tugas1_IMK.pdf",
+  "rubric": {
+    "name": "Rubrik PS-1",
+    "description": "<div><div>Rubrik untuk menilai tugas laporan ALPRO</div></div>",
+    "rubric": {
+      "rubric_criteria": [
+        {
+          "id": 3,
+          "sortorder": 1,
+          "description": "Dasar Teori",
+          "levels": [
+            {
+              "id": 7,
+              "score": 0,
+              "definition": "Dasar teori dikemukakan dengan tidak jelas"
+            },
+            {
+              "id": 9,
+              "score": 6,
+              "definition": "Dasar teori dikemukakan dengan kurang jelas dan kurang informatif"
+            },
+            {
+              "id": 19,
+              "score": 10,
+              "definition": "Dasar teori dikemukakan dengan jelas dan dapat dimengerti"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "sortorder": 2,
+          "description": "Kode Program",
+          "levels": [
+            {
+              "id": 16,
+              "score": 0,
+              "definition": "Program tidak efisien, penamaan variabel tidak informatif"
+            },
+            {
+              "id": 17,
+              "score": 30,
+              "definition": "Program kurang efisien, penamaan variabel kurang informatif"
+            },
+            {
+              "id": 18,
+              "score": 50,
+              "definition": "Program efisien, penamaan variabel informatif"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "sortorder": 3,
+          "description": "Keterangan Baris Program",
+          "levels": [
+            {
+              "id": 25,
+              "score": 0,
+              "definition": "Baris code tidak diberikan penjelasan atau tidak informatif"
+            },
+            {
+              "id": 26,
+              "score": 12,
+              "definition": "Baris code kurang informatif penjelasannya"
+            },
+            {
+              "id": 27,
+              "score": 20,
+              "definition": "Setiap baris code diberikan penjelasan"
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "sortorder": 4,
+          "description": "Kesimpulan",
+          "levels": [
+            {
+              "id": 28,
+              "score": 0,
+              "definition": "Kesimpulan tidak dapat dipahami"
+            },
+            {
+              "id": 29,
+              "score": 12,
+              "definition": "Kesimpulan kurang jelas"
+            },
+            {
+              "id": 30,
+              "score": 20,
+              "definition": "Dapat menyimpulkan materi ataupun program yang telah dibuat"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

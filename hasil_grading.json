@@ -1,0 +1,54 @@
+{
+  "assignment_id": "01",
+  "user_id": "1121033",
+  "advancedgradingdata": {
+    "rubric": {
+      "criteria": [
+        {
+          "criterionid": 3,
+          "fillings": [
+            {
+              "criterionid": 3,
+              "levelid": 9,
+              "remark": "Dasar teori dikemukakan kurang jelas dan kurang informatif. Beberapa konsep dijelaskan, namun kurang mendalam dan tidak terstruktur dengan baik. Skor: 6",
+              "confidence": 0.7
+            }
+          ]
+        },
+        {
+          "criterionid": 6,
+          "fillings": [
+            {
+              "criterionid": 6,
+              "levelid": 17,
+              "remark": "Kode program kurang efisien dan penamaan variabel kurang informatif. Meskipun program berfungsi, terdapat potensi untuk optimasi dan penggunaan nama variabel yang lebih deskriptif. Skor: 30",
+              "confidence": 0.6
+            }
+          ]
+        },
+        {
+          "criterionid": 9,
+          "fillings": [
+            {
+              "criterionid": 9,
+              "levelid": 26,
+              "remark": "Penjelasan baris code kurang informatif. Beberapa baris kode dijelaskan, namun tidak semua baris memiliki penjelasan yang cukup atau relevan. Skor: 12",
+              "confidence": 0.8
+            }
+          ]
+        },
+        {
+          "criterionid": 10,
+          "fillings": [
+            {
+              "criterionid": 10,
+              "levelid": 20,
+              "remark": "Kesimpulan dapat menyimpulkan materi ataupun program yang telah dibuat. Skor: 20",
+              "confidence": 0.9
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

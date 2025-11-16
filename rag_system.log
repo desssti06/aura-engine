@@ -1,0 +1,14 @@
+2025-11-14 07:08:32,271 - INFO - ============================================================
+2025-11-14 07:08:32,271 - INFO - RAG AUTO-GRADING SYSTEM v3.0 - Session Started
+2025-11-14 07:08:32,271 - INFO - ============================================================
+2025-11-14 07:08:32,458 - INFO - Use pytorch device_name: cpu
+2025-11-14 07:08:32,458 - INFO - Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+2025-11-14 07:08:41,373 - INFO - Use pytorch device_name: cpu
+2025-11-14 07:08:41,374 - INFO - Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+2025-11-14 07:09:55,238 - INFO - ============================================================
+2025-11-14 07:09:55,238 - INFO - RAG AUTO-GRADING SYSTEM v3.0 - Session Started
+2025-11-14 07:09:55,268 - INFO - ============================================================
+2025-11-14 07:09:55,538 - INFO - Use pytorch device_name: cpu
+2025-11-14 07:09:55,538 - INFO - Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+2025-11-14 07:10:07,058 - INFO - Use pytorch device_name: cpu
+2025-11-14 07:10:07,058 - INFO - Load pretrained SentenceTransformer: all-MiniLM-L6-v2

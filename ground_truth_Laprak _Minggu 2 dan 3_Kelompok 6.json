@@ -1,0 +1,12 @@
+{
+  "advancedgradingdata": {
+    "rubric": {
+      "criteria": [
+        { "criterionid": 3, "fillings": [{ "criterionid": 3, "levelid": 9 }] },
+        { "criterionid": 6, "fillings": [{ "criterionid": 6, "levelid": 18 }] },
+        { "criterionid": 9, "fillings": [{ "criterionid": 9, "levelid": 27 }] },
+        { "criterionid": 10, "fillings": [{ "criterionid": 10, "levelid": 30 }] }
+      ]
+    }
+  }
+}
