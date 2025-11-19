@@ -5,7 +5,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import httpx
 
-from rag_grading_improved2 import PDFExtractor, RAGEngine, GradingEngine, Config
+from rag_grading_improved import PDFExtractor, RAGEngine, GradingEngine, Config
 
 
 def _append_query_param(url: str, key: str, value: str) -> str:
@@ -46,7 +46,7 @@ def process_grading(assignment_id: str, user_id: str, assignment_url: str, rubri
     rag_engine.build_index(extracted["text"])
 
     # 4. Grading
-    grader = GradingEngine(Config)
+    grader = GradingEngine()
     grading_result = grader.grade_document(rag_engine, rubric_data)
 
     return {

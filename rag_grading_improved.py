@@ -15,46 +15,70 @@ from tqdm import tqdm
 
 load_dotenv()
 
-
 # ==========================================================
-# CONFIGURATION
+# CONFIGURATION — 100% ENV ONLY (NO HARDCODE)
 # ==========================================================
 class Config:
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_API_URL = os.getenv("GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent")
+    # API KEYS & ENDPOINTS
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    GEMINI_API_URL = os.getenv("GEMINI_API_URL")
 
-    OPENROUTER_KEY = os.getenv("OPENROUTER_KEY", "")
-    OPENROUTER_URL = os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions")
+    OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
+    OPENROUTER_URL = os.getenv("OPENROUTER_URL")
 
-    MODEL = os.getenv("MODEL", "google/gemini-2.0-flash")
-    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+    # MODELS
+    MODEL = os.getenv("MODEL")
+    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
 
-    MOODLE_DOWNLOAD_TOKEN = os.getenv("MOODLE_DOWNLOAD_TOKEN", "")
+    # MOODLE TOKEN
+    MOODLE_TOKEN = os.getenv("MOODLE_TOKEN")
+    MOODLE_DOWNLOAD_TOKEN = os.getenv("MOODLE_DOWNLOAD_TOKEN") or MOODLE_TOKEN
 
-    CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))
-    CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
-    TOP_K_RETRIEVAL = int(os.getenv("TOP_K_RETRIEVAL", "5"))
-    SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.65"))
+    # RAG SETTINGS
+    CHUNK_SIZE = int(os.getenv("CHUNK_SIZE"))
+    CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP"))
+    TOP_K_RETRIEVAL = int(os.getenv("TOP_K_RETRIEVAL"))
+    SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD"))
+    TEMPERATURE = float(os.getenv("TEMPERATURE"))
+
+    # LOGGING
+    LOG_LEVEL = os.getenv("LOG_LEVEL")
+    LOG_FILE = os.getenv("LOG_FILE")
+
+    # FOLDERS
+    DATA_FOLDER = os.getenv("DATA_FOLDER")
+    OUTPUT_FOLDER = os.getenv("OUTPUT_FOLDER")
+    RUBRIC_FILE = os.getenv("RUBRIC_FILE")
 
     MIN_CONFIDENCE_THRESHOLD = 0.6
-    TEMPERATURE = 0.0
-
-    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-    LOG_FILE = os.getenv("LOG_FILE", "rag_system.log")
-
-    DATA_FOLDER = "data"
-    OUTPUT_FOLDER = "output"
-    RUBRIC_FILE = "data/rubrik.json"
 
     @classmethod
     def validate(cls):
         errors = []
-        if not (cls.OPENROUTER_KEY or cls.GEMINI_API_KEY):
-            errors.append("Tidak ditemukan API key (OPENROUTER_KEY atau GEMINI_API_KEY).")
+
+        required_env = {
+            "GEMINI_API_KEY": cls.GEMINI_API_KEY,
+            "GEMINI_API_URL": cls.GEMINI_API_URL,
+            "MODEL": cls.MODEL,
+            "EMBEDDING_MODEL": cls.EMBEDDING_MODEL,
+            "DATA_FOLDER": cls.DATA_FOLDER,
+            "OUTPUT_FOLDER": cls.OUTPUT_FOLDER,
+            "RUBRIC_FILE": cls.RUBRIC_FILE,
+        }
+
+        for key, value in required_env.items():
+            if value is None:
+                errors.append(f"❌ Missing ENV variable: {key}")
+
+        if not cls.MOODLE_DOWNLOAD_TOKEN:
+            errors.append("❌ Missing ENV variable: MOODLE_TOKEN atau MOODLE_DOWNLOAD_TOKEN.")
+
         if cls.CHUNK_SIZE <= 0:
-            errors.append("CHUNK_SIZE harus > 0.")
-        if cls.CHUNK_OVERLAP < 0 or cls.CHUNK_OVERLAP >= cls.CHUNK_SIZE:
-            errors.append("CHUNK_OVERLAP harus antara 0 dan CHUNK_SIZE.")
+            errors.append("❌ CHUNK_SIZE harus > 0.")
+
+        if cls.CHUNK_OVERLAP >= cls.CHUNK_SIZE:
+            errors.append("❌ CHUNK_OVERLAP tidak boleh lebih besar dari CHUNK_SIZE.")
+
         return errors
 
 
@@ -63,18 +87,22 @@ class Config:
 # ==========================================================
 def setup_logging():
     log_level = getattr(logging, Config.LOG_LEVEL.upper(), logging.INFO)
+
     logging.basicConfig(
         level=log_level,
         format="%(asctime)s - %(levelname)s - %(message)s",
-        handlers=[logging.FileHandler(Config.LOG_FILE, encoding="utf-8"), logging.StreamHandler()],
+        handlers=[
+            logging.FileHandler(Config.LOG_FILE, encoding="utf-8"),
+            logging.StreamHandler(),
+        ],
     )
     logging.info("=" * 60)
-    logging.info("RAG AUTO-GRADING SYSTEM v3.0 - Session Started")
+    logging.info("RAG AUTO-GRADING SYSTEM — SAFE MODE")
     logging.info("=" * 60)
 
 
 # ==========================================================
-# PDF EXTRACTOR
+# PDF EXTRACTION
 # ==========================================================
 class PDFExtractor:
     @staticmethod
@@ -82,20 +110,24 @@ class PDFExtractor:
         try:
             reader = PdfReader(pdf_path)
             pages = []
+
             for i, page in enumerate(reader.pages):
                 text = page.extract_text() or ""
                 if text.strip():
                     pages.append({"page_num": i + 1, "text": text.strip()})
-            text = "\n".join([p["text"] for p in pages])
+
+            full_text = "\n".join(p["text"] for p in pages)
             filename = Path(pdf_path).stem
+
             return {
-                "text": text,
+                "text": full_text,
                 "filename": filename,
                 "page_count": len(pages),
                 "metadata": {"kelompok": filename},
             }
+
         except Exception as e:
-            logging.error(f"Error extracting PDF {pdf_path}: {e}")
+            logging.error(f"❌ PDF Extract Error: {e}")
             return None
 
 
@@ -103,32 +135,38 @@ class PDFExtractor:
 # RAG ENGINE
 # ==========================================================
 class RAGEngine:
-    def __init__(self, model_name: str = Config.EMBEDDING_MODEL):
-        self.embedder = SentenceTransformer(model_name)
+    def __init__(self):
+        self.embedder = SentenceTransformer(Config.EMBEDDING_MODEL)
         self.index = None
         self.chunks = []
 
-    def build_index(self, text: str, chunk_size: int = Config.CHUNK_SIZE, chunk_overlap: int = Config.CHUNK_OVERLAP):
-        splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    def build_index(self, text: str):
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=Config.CHUNK_SIZE,
+            chunk_overlap=Config.CHUNK_OVERLAP,
+        )
         self.chunks = splitter.split_text(text)
         embeddings = self.embedder.encode(self.chunks, convert_to_numpy=True)
+
         self.index = faiss.IndexFlatL2(embeddings.shape[1])
         self.index.add(np.array(embeddings, dtype=np.float32))
 
-    def search(self, query: str, k: int = Config.TOP_K_RETRIEVAL) -> List[str]:
-        if not self.index:
+    def search(self, query: str, k: int = Config.TOP_K_RETRIEVAL):
+        if self.index is None:
             return []
+
         q_emb = self.embedder.encode([query], convert_to_numpy=True)
         D, I = self.index.search(np.array(q_emb, dtype=np.float32), k)
-        return [self.chunks[i] for i in I[0] if i < len(self.chunks)]
 
-    def search_multi_query(self, queries: List[str], k: int = 3) -> List[str]:
+        return [self.chunks[i] for i in I[0] if 0 <= i < len(self.chunks)]
+
+    def search_multi_query(self, queries: List[str], k=3):
         seen, results = set(), []
         for q in queries:
-            for r in self.search(q, k):
-                if r not in seen:
-                    seen.add(r)
-                    results.append(r)
+            for chunk in self.search(q, k):
+                if chunk not in seen:
+                    seen.add(chunk)
+                    results.append(chunk)
         return results
 
 
@@ -136,27 +174,15 @@ class RAGEngine:
 # GRADING ENGINE
 # ==========================================================
 class GradingEngine:
-    def __init__(self, config: Config = Config()):
-        self.config = config
+    def __init__(self):
+        pass
 
-    def grade_document(self, rag_engine: RAGEngine, rubric_data: Dict) -> Dict:
-        criteria = rubric_data.get("rubric", {}).get("rubric_criteria", [])
-        evidence_map = {}
-        for crit in criteria:
-            queries = [f"Cari bagian terkait {crit.get('description', '')}"]
-            evidence = rag_engine.search_multi_query(queries)
-            evidence_map[str(crit.get("id"))] = evidence
-
-        evidence_text = "\n".join(sum(evidence_map.values(), []))
-        prompt = self._build_prompt(rubric_data, evidence_text)
-        response = self._call_llm(prompt)
-        return self._parse_response(response)
-
+    # BUILD PROMPT
     def _build_prompt(self, rubric_data: Dict, evidence: str) -> str:
         rubric_json = json.dumps(rubric_data, indent=2, ensure_ascii=False)
+
         return f"""
-Anda adalah sistem penilaian otomatis.
-Gunakan hanya evidence berikut untuk menilai dokumen berdasarkan rubrik.
+Anda adalah sistem penilaian otomatis berbasis evidence.
 
 --- RUBRIK ---
 {rubric_json}
@@ -164,8 +190,7 @@ Gunakan hanya evidence berikut untuk menilai dokumen berdasarkan rubrik.
 --- EVIDENCE ---
 {evidence}
 
-Keluarkan hasil dalam format JSON persis berikut:
-
+Kembalikan hanya JSON dengan struktur:
 {{
   "advancedgradingdata": {{
     "rubric": {{
@@ -176,8 +201,8 @@ Keluarkan hasil dalam format JSON persis berikut:
             {{
               "criterionid": <int>,
               "levelid": <int>,
-              "remark": "<penjelasan hasil dan skor>",
-              "confidence": <float antara 0-1>
+              "remark": "<text>",
+              "confidence": <float>
             }}
           ]
         }}
@@ -185,83 +210,38 @@ Keluarkan hasil dalam format JSON persis berikut:
     }}
   }}
 }}
-
-Hanya keluarkan JSON, tanpa teks tambahan.
 """
 
+    # CALL LLM — ENV ONLY
     def _call_llm(self, prompt: str) -> str:
         try:
-            if self.config.GEMINI_API_KEY:
-                headers = {"Content-Type": "application/json"}
-                payload = {"contents": [{"parts": [{"text": prompt}]}]}
-                resp = requests.post(
-                    f"{self.config.GEMINI_API_URL}?key={self.config.GEMINI_API_KEY}",
-                    headers=headers,
-                    json=payload,
-                    timeout=120,
-                )
-                resp.raise_for_status()
-                data = resp.json()
+            headers = {"Content-Type": "application/json"}
 
-                candidates = data.get("candidates", [])
-                if not candidates:
-                    raise ValueError("Response Gemini kosong.")
-                return candidates[0]["content"]["parts"][0].get("text", "{}")
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+            }
 
-            elif self.config.OPENROUTER_KEY:
-                headers = {"Authorization": f"Bearer {self.config.OPENROUTER_KEY}", "Content-Type": "application/json"}
-                payload = {
-                    "model": self.config.MODEL,
-                    "messages": [
-                        {"role": "system", "content": "Kamu hanya menjawab dengan JSON valid."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    "temperature": self.config.TEMPERATURE,
-                }
-                resp = requests.post(self.config.OPENROUTER_URL, headers=headers, json=payload, timeout=120)
-                resp.raise_for_status()
-                data = resp.json()
-                return data["choices"][0]["message"]["content"]
+            url = f"{Config.GEMINI_API_URL}?key={Config.GEMINI_API_KEY}"
 
-            else:
-                raise ValueError("Tidak ada API key.")
+            resp = requests.post(url, json=payload, headers=headers, timeout=120)
+            resp.raise_for_status()
+
+            data = resp.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
 
         except Exception as e:
-            logging.error(f"LLM call failed: {e}")
+            logging.error(f"❌ LLM ERROR: {e}")
             return "{}"
 
-    def _parse_response(self, response: str) -> Dict:
+    # PARSE JSON
+    def _parse(self, text: str) -> Dict:
         try:
-            if not response or response.strip() == "{}":
-                logging.warning("Response kosong dari LLM.")
-                return {
-                    "advancedgradingdata": {
-                        "rubric": {
-                            "criteria": [
-                                {
-                                    "criterionid": 0,
-                                    "fillings": [
-                                        {
-                                            "criterionid": 0,
-                                            "levelid": 0,
-                                            "remark": "LLM tidak mengembalikan hasil.",
-                                            "confidence": 0.0,
-                                        }
-                                    ],
-                                }
-                            ]
-                        }
-                    }
-                }
+            if "```" in text:
+                text = text.split("```")[1].replace("json", "").strip()
+            return json.loads(text)
 
-            if "```" in response:
-                response = response.split("```")[1].replace("json", "").strip()
-
-            data = json.loads(response.strip())
-            return data
-
-        except json.JSONDecodeError as e:
-            logging.error(f"Error parsing LLM response: {e}")
+        except Exception as e:
+            logging.error(f"❌ JSON PARSE ERROR: {e}")
             return {
                 "advancedgradingdata": {
                     "rubric": {
@@ -282,34 +262,49 @@ Hanya keluarkan JSON, tanpa teks tambahan.
                 }
             }
 
+    # MAIN GRADING
+    def grade_document(self, rag_engine: RAGEngine, rubric: Dict):
+        criteria = rubric["rubric"]["rubric_criteria"]
+        evidence_map = {}
+
+        for crit in criteria:
+            query = [f"Cari evidence tentang {crit['description']}"]
+            evidence_map[str(crit["id"])] = rag_engine.search_multi_query(query)
+
+        evidence_text = "\n".join(sum(evidence_map.values(), []))
+        prompt = self._build_prompt(rubric, evidence_text)
+        response = self._call_llm(prompt)
+
+        return self._parse(response)
+
 
 # ==========================================================
 # BATCH PROCESSOR
 # ==========================================================
 class BatchProcessor:
-    def __init__(self, config: Config = Config()):
-        self.config = config
-        self.pdf_extractor = PDFExtractor()
-        self.grading_engine = GradingEngine(config)
+    def __init__(self):
+        self.extractor = PDFExtractor()
+        self.grader = GradingEngine()
 
-    def process_folder(self, folder_path: str, rubric_path: str) -> List[Dict]:
-        with open(rubric_path, "r", encoding="utf-8") as f:
+    def process_folder(self, folder: str, rubric_file: str):
+        with open(rubric_file, "r", encoding="utf-8") as f:
             rubric_data = json.load(f)
 
-        pdf_files = list(Path(folder_path).glob("*.pdf"))
+        pdfs = list(Path(folder).glob("*.pdf"))
         results = []
 
-        for pdf_file in tqdm(pdf_files, desc="Processing PDFs"):
-            extracted = self.pdf_extractor.extract_text_with_metadata(str(pdf_file))
+        for pdf in tqdm(pdfs, desc="Processing PDFs"):
+            extracted = self.extractor.extract_text_with_metadata(str(pdf))
             if not extracted:
                 continue
 
-            rag_engine = RAGEngine()
-            rag_engine.build_index(extracted["text"])
+            rag = RAGEngine()
+            rag.build_index(extracted["text"])
 
-            grading_result = self.grading_engine.grade_document(rag_engine, rubric_data)
-            grading_result["document_info"] = extracted
-            results.append(grading_result)
+            result = self.grader.grade_document(rag, rubric_data)
+            result["document_info"] = extracted
+
+            results.append(result)
 
         return results
 
@@ -319,37 +314,24 @@ class BatchProcessor:
 # ==========================================================
 def main():
     setup_logging()
+
     errors = Config.validate()
     if errors:
         for e in errors:
-            print(f"❌ {e}")
+            print(e)
         return
+
+    os.makedirs(Config.OUTPUT_FOLDER, exist_ok=True)
 
     processor = BatchProcessor()
     results = processor.process_folder(Config.DATA_FOLDER, Config.RUBRIC_FILE)
 
-    print("\n" + "=" * 80)
-    print("📄 HASIL PENILAIAN (DITAMPILKAN LANGSUNG DI TERMINAL)")
-    print("=" * 80)
+    out_path = os.path.join(Config.OUTPUT_FOLDER, "hasil_grading.json")
 
-    for i, result in enumerate(results, start=1):
-        print(f"\n📘 Dokumen #{i}: {result.get('document_info', {}).get('filename', 'Unknown')}")
-        print(json.dumps(result, indent=2, ensure_ascii=False))
-
-    # ==========================================================
-    # SIMPAN KE JSON
-    # ==========================================================
-    os.makedirs(Config.OUTPUT_FOLDER, exist_ok=True)
-    output_path = os.path.join(Config.OUTPUT_FOLDER, "hasil_grading.json")
-
-    with open(output_path, "w", encoding="utf-8") as f:
+    with open(out_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
 
-    print(f"\n💾 Hasil grading disimpan ke: {output_path}")
-
-    print("\n" + "=" * 80)
-    print("✅ Semua hasil grading sudah ditampilkan & disimpan.")
-    print("=" * 80)
+    print(f"👉 Saved to: {out_path}")
 
 
 if __name__ == "__main__":
