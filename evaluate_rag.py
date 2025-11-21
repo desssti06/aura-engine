@@ -23,21 +23,58 @@ predictions = [
         "assignment_id": "01",
         "user_id": "1121033",
         "document_info": {"filename": "_LP 12 & 13_Kelompok 6.docx.pdf"},
-        "advancedgradingdata": {
-            "rubric": {"criteria": [
-                {"criterionid":3,"fillings":[{"criterionid":3,"levelid":19,
-                    "remark":"Dasar teori mengenai output, operasi aritmatika, eksekusi kondisional, dan konversi tipe data dijelaskan dengan cukup jelas.","confidence":0.8}]},
-
-                {"criterionid":6,"fillings":[{"criterionid":6,"levelid":16,
-                    "remark":"Kode program yang diberikan kurang efisien dan penamaan variabel kurang informatif","confidence":0.6}]},
-
-                {"criterionid":9,"fillings":[{"criterionid":9,"levelid":27,
-                    "remark":"Penjelasan baris kode kurang informatif","confidence":0.7}]},
-
-                {"criterionid":10,"fillings":[{"criterionid":10,"levelid":28,
-                    "remark":"Kesimpulan kurang jelas.","confidence":0.6}]}
-            ]}
+         "assignment_id": "01",
+  "user_id": "1121033",
+  "advancedgradingdata": {
+    "rubric": {
+      "criteria": [
+        {
+          "criterionid": 3,
+          "fillings": [
+            {
+              "criterionid": 3,
+              "levelid": 9,
+              "remark": "Dasar teori dikemukakan kurang jelas dan kurang informatif.",
+              "confidence": 0.8
+            }
+          ]
+        },
+        {
+          "criterionid": 6,
+          "fillings": [
+            {
+              "criterionid": 6,
+              "levelid": 17,
+              "remark": "Program kurang efisien, penamaan variabel kurang informatif.",
+              "confidence": 0.7
+            }
+          ]
+        },
+        {
+          "criterionid": 9,
+          "fillings": [
+            {
+              "criterionid": 9,
+              "levelid": 26,
+              "remark": "Baris code kurang informatif penjelasannya.",
+              "confidence": 0.6
+            }
+          ]
+        },
+        {
+          "criterionid": 10,
+          "fillings": [
+            {
+              "criterionid": 10,
+              "levelid": 29,
+              "remark": "Kesimpulan kurang jelas.",
+              "confidence": 0.7
+            }
+          ]
         }
+      ]
+    }
+  }
     }
 ]
 
@@ -177,7 +214,7 @@ def evaluate_full(pdf_path, predictions, rubric):
         "items": results
     }
 
-pdf_path = "data\\LP 2 & 3_Kelompok 4.pdf"   # GANTI DENGAN FILE PDF YANG BENAR
+pdf_path = "/data/_LP 12 & 13_Kelompok 6.docx.pdf"   # GANTI DENGAN FILE PDF YANG BENAR
 
 report = evaluate_full(pdf_path, predictions, rubric)
 
