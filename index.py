@@ -1,5 +1,6 @@
 import argparse
 import json
+import sys
 import tempfile
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
@@ -58,19 +59,27 @@ def process_grading(assignment_id: str, user_id: str, assignment_url: str, rubri
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AI Auto Grading CLI")
-    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group = parser.add_mutually_exclusive_group()
     input_group.add_argument("--input", help="JSON input string")
     input_group.add_argument("--input-file", help="Path ke file JSON input")
     args = parser.parse_args()
 
-    raw_payload = args.input
-    if args.input_file:
+    raw_payload = None
+    if args.input:
+        raw_payload = args.input
+    elif args.input_file:
         try:
             with open(args.input_file, "r", encoding="utf-8") as fh:
                 raw_payload = fh.read()
         except Exception as e:
             print(json.dumps({"error": f"Gagal membaca file input: {e}"}))
             exit(1)
+    else:
+        if sys.stdin is not None and not sys.stdin.isatty():
+            raw_payload = sys.stdin.read()
+
+    if not raw_payload:
+        parser.error("Berikan payload JSON via --input, --input-file, atau stdin")
 
     try:
         data = json.loads(raw_payload)
@@ -78,19 +87,27 @@ if __name__ == "__main__":
         print(json.dumps({"error": f"Gagal parsing input JSON: {e}"}))
         exit(1)
 
-    # Ambil field
-    user_id = data.get("userId")
-    assignment_id = data.get("assignmentId")
-    assignment_url = data.get("assignmentUrl")
+    # Ambil field (dukung camelCase maupun snake_case)
+    user_id = data.get("userId") or data.get("user_id")
+    assignment_id = data.get("assignmentId") or data.get("assignment_id")
+    assignment_url = (
+        data.get("assignmentUrl")
+        or data.get("assignment_url")
+        or data.get("submission_url")
+    )
     rubric_data = data.get("rubric")
 
     if not (user_id and assignment_id and assignment_url and rubric_data):
-        print(json.dumps({"error": "Field wajib (userId, assignmentId, assignmentUrl, rubric) tidak lengkap"}))
+        print(json.dumps({"error": "Field wajib (userId/assignmentId/assignmentUrl/rubric) tidak lengkap"}))
         exit(1)
 
+    if rubric_data and "rubric" not in rubric_data and "rubric_criteria" in rubric_data:
+        # Normalisasi agar kompatibel dengan struktur yang diharapkan grader
+        rubric_data = {**{k: v for k, v in rubric_data.items() if k != "rubric_criteria"}, "rubric": {"rubric_criteria": rubric_data["rubric_criteria"]}}
+
     result = process_grading(
-        assignment_id=assignment_id,
-        user_id=user_id,
+        assignment_id=str(assignment_id),
+        user_id=str(user_id),
         assignment_url=assignment_url,
         rubric_data=rubric_data,
     )

@@ -16,7 +16,7 @@ from tqdm import tqdm
 load_dotenv()
 
 # ==========================================================
-# CONFIGURATION — 100% ENV ONLY (NO HARDCODE)
+# CONFIGURATION 
 # ==========================================================
 class Config:
     # API KEYS & ENDPOINTS
@@ -182,7 +182,7 @@ class GradingEngine:
         rubric_json = json.dumps(rubric_data, indent=2, ensure_ascii=False)
 
         return f"""
-Anda adalah sistem penilaian otomatis berbasis evidence.
+Anda adalah sistem penilaian otomatis berbasis evidence. Anda hanya boleh memilih level_id dari rubric yang diberikan, Dilarang membuat level_id baru.
 
 --- RUBRIK ---
 {rubric_json}
