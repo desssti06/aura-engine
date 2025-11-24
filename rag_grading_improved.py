@@ -1,16 +1,17 @@
 import os
 import json
-import numpy as np
-import faiss
-import requests
+import hashlib
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict
-from PyPDF2 import PdfReader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sentence_transformers import SentenceTransformer
+from typing import Dict, List, Optional
+
+import requests
+from chromadb import PersistentClient
 from dotenv import load_dotenv
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from PyPDF2 import PdfReader
+from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
 load_dotenv()
@@ -49,6 +50,7 @@ class Config:
     DATA_FOLDER = os.getenv("DATA_FOLDER")
     OUTPUT_FOLDER = os.getenv("OUTPUT_FOLDER")
     RUBRIC_FILE = os.getenv("RUBRIC_FILE")
+    VECTOR_STORE_DIR = os.getenv("VECTOR_STORE_DIR", str(Path("vector_store").resolve()))
 
     MIN_CONFIDENCE_THRESHOLD = 0.6
 
@@ -134,36 +136,149 @@ class PDFExtractor:
 # ==========================================================
 # RAG ENGINE
 # ==========================================================
+def _classify_chunk(text: str) -> str:
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        return "narrative"
+
+    code_like = 0
+    for line in lines:
+        stripped = line.lstrip()
+        if stripped.startswith((
+            "for ",
+            "if ",
+            "while ",
+            "def ",
+            "class ",
+            "public ",
+            "private ",
+            "int ",
+            "float ",
+        )):
+            code_like += 1
+            continue
+        if stripped.startswith(("#", "//", "/*")):
+            code_like += 1
+            continue
+        if stripped.endswith((";", "{", "}")):
+            code_like += 1
+
+    symbol_ratio = sum(1 for ch in text if ch in "{}();[]=<>" ) / max(len(text), 1)
+    if code_like >= max(2, len(lines) // 2) or symbol_ratio > 0.04:
+        return "code"
+    return "narrative"
+
+
 class RAGEngine:
     def __init__(self):
         self.embedder = SentenceTransformer(Config.EMBEDDING_MODEL)
-        self.index = None
-        self.chunks = []
+        persist_dir = Path(Config.VECTOR_STORE_DIR)
+        persist_dir.mkdir(parents=True, exist_ok=True)
 
-    def build_index(self, text: str):
+        self._client = PersistentClient(path=str(persist_dir))
+        self._collection = self._client.get_or_create_collection(
+            name="auto-grading-chunks",
+            metadata={"source": "pdf-chunks"},
+        )
+        self._current_doc_id: Optional[str] = None
+        self._doc_chunk_count = 0
+
+    def build_index(self, text: str, doc_id: str, metadata: Optional[Dict] = None):
+        if not doc_id:
+            raise ValueError("doc_id diperlukan untuk indexing")
+
+        self._current_doc_id = doc_id
+        self._doc_chunk_count = 0
+
+        existing = self._collection.get(where={"doc_id": {"$eq": doc_id}}, include=["metadatas", "documents"])
+        ids = existing.get("ids") if existing else []
+        if ids:
+            metas = existing.get("metadatas") or []
+            if metas and metas[0].get("chunk_type"):
+                self._doc_chunk_count = len(ids)
+                logging.debug("Reuse Chroma cache untuk %s (%d chunk)", doc_id, self._doc_chunk_count)
+                return
+            self._collection.delete(where={"doc_id": {"$eq": doc_id}})
+            logging.debug("Refresh Chroma cache untuk %s", doc_id)
+
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=Config.CHUNK_SIZE,
             chunk_overlap=Config.CHUNK_OVERLAP,
+            separators=[
+                "\nclass ",
+                "\ndef ",
+                "\nfunction ",
+                "\npublic ",
+                "\nprivate ",
+                "\nfor ",
+                "\nwhile ",
+                "\nif ",
+                "\n",
+                " ",
+            ],
         )
-        self.chunks = splitter.split_text(text)
-        embeddings = self.embedder.encode(self.chunks, convert_to_numpy=True)
+        chunks = splitter.split_text(text)
+        if not chunks:
+            logging.warning("Tidak ada chunk yang dihasilkan untuk %s", doc_id)
+            return
 
-        self.index = faiss.IndexFlatL2(embeddings.shape[1])
-        self.index.add(np.array(embeddings, dtype=np.float32))
+        embeddings = self.embedder.encode(chunks, convert_to_numpy=True)
 
-    def search(self, query: str, k: int = Config.TOP_K_RETRIEVAL):
-        if self.index is None:
+        base_meta = {k: v for k, v in (metadata or {}).items() if v is not None}
+        ids = [f"{doc_id}-{i}" for i in range(len(chunks))]
+        metadatas = []
+        for i, chunk in enumerate(chunks):
+            metadatas.append({
+                **base_meta,
+                "doc_id": doc_id,
+                "chunk_idx": i,
+                "chunk_type": _classify_chunk(chunk),
+            })
+
+        self._collection.add(
+            ids=ids,
+            documents=chunks,
+            embeddings=embeddings.tolist(),
+            metadatas=metadatas,
+        )
+
+        self._doc_chunk_count = len(chunks)
+        logging.debug("Simpan %d chunk untuk %s", self._doc_chunk_count, doc_id)
+
+    def search(self, query: str, k: int = Config.TOP_K_RETRIEVAL, filters: Optional[Dict] = None):
+        if not self._current_doc_id or self._doc_chunk_count == 0:
             return []
 
-        q_emb = self.embedder.encode([query], convert_to_numpy=True)
-        D, I = self.index.search(np.array(q_emb, dtype=np.float32), k)
+        q_emb = self.embedder.encode([query], convert_to_numpy=True)[0].tolist()
+        k = max(1, min(k, self._doc_chunk_count))
 
-        return [self.chunks[i] for i in I[0] if 0 <= i < len(self.chunks)]
+        conditions = [{"doc_id": {"$eq": self._current_doc_id}}]
+        if filters:
+            for key, value in filters.items():
+                conditions.append({key: {"$eq": value}})
 
-    def search_multi_query(self, queries: List[str], k=3):
+        if len(conditions) == 1:
+            where = conditions[0]
+        else:
+            where = {"$and": conditions}
+
+        results = self._collection.query(
+            query_embeddings=[q_emb],
+            n_results=k,
+            where=where,
+            include=["documents"],
+        )
+
+        documents = results.get("documents", [[]])
+        if not documents or not documents[0]:
+            return []
+
+        return documents[0]
+
+    def search_multi_query(self, queries: List[str], k: int = 3, filters: Optional[Dict] = None):
         seen, results = set(), []
         for q in queries:
-            for chunk in self.search(q, k):
+            for chunk in self.search(q, k, filters=filters):
                 if chunk not in seen:
                     seen.add(chunk)
                     results.append(chunk)
@@ -176,6 +291,22 @@ class RAGEngine:
 class GradingEngine:
     def __init__(self):
         pass
+
+    _CRITERION_HINTS = {
+        6: {
+            "filters": {"chunk_type": "code"},
+            "extra_queries": [
+                "Ambil potongan kode program yang relevan",
+                "Cuplikan fungsi atau algoritma",
+            ],
+        },
+        9: {
+            "filters": {"chunk_type": "code"},
+            "extra_queries": [
+                "Cari kode beserta penjelasan baris",
+            ],
+        },
+    }
 
     # BUILD PROMPT
     def _build_prompt(self, rubric_data: Dict, evidence: str) -> str:
@@ -268,8 +399,16 @@ Kembalikan hanya JSON dengan struktur:
         evidence_map = {}
 
         for crit in criteria:
+            cid = int(crit["id"])
+            hints = self._CRITERION_HINTS.get(cid, {})
+
             query = [f"Cari evidence tentang {crit['description']}"]
-            evidence_map[str(crit["id"])] = rag_engine.search_multi_query(query)
+            query.extend(hints.get("extra_queries", []))
+
+            evidence_map[str(cid)] = rag_engine.search_multi_query(
+                query,
+                filters=hints.get("filters"),
+            )
 
         evidence_text = "\n".join(sum(evidence_map.values(), []))
         prompt = self._build_prompt(rubric, evidence_text)
@@ -298,8 +437,15 @@ class BatchProcessor:
             if not extracted:
                 continue
 
+            doc_bytes = Path(pdf).read_bytes()
+            doc_id = hashlib.md5(doc_bytes).hexdigest()
+
             rag = RAGEngine()
-            rag.build_index(extracted["text"])
+            rag.build_index(
+                text=extracted["text"],
+                doc_id=doc_id,
+                metadata={"filename": extracted.get("filename")},
+            )
 
             result = self.grader.grade_document(rag, rubric_data)
             result["document_info"] = extracted

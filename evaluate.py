@@ -63,56 +63,56 @@ predictions = [
     {
         "assignment_id": "01",
         "user_id": "1121033",
-        "document_info": {"filename": "LP 2 & 3_Kelompok 4.pdf"},
+        "document_info": {"filename": "_LP 12 & 13_Kelompok 6.docx.pdf"},
         "advancedgradingdata": {
-          "rubric": {
-            "criteria": [
-              {
-                "criterionid": 3,
-                "fillings": [
-                  {
-                    "criterionid": 3,
-                    "levelid": 19,
-                    "remark": "Dasar teori dikemukakan dengan jelas dan dapat dimengerti",
-                    "confidence": 0.8
-                  }
-                ]
-              },
-              {
-                "criterionid": 6,
-                "fillings": [
-                  {
-                    "criterionid": 6,
-                    "levelid": 17,
-                    "remark": "Program kurang efisien, penamaan variabel kurang informatif",
-                    "confidence": 0.7
-                  }
-                ]
-              },
-              {
-                "criterionid": 9,
-                "fillings": [
-                  {
-                    "criterionid": 9,
-                    "levelid": 26,
-                    "remark": "Baris code kurang informatif penjelasannya",
-                    "confidence": 0.6
-                  }
-                ]
-              },
-              {
-                "criterionid": 10,
-                "fillings": [
-                  {
-                    "criterionid": 10,
-                    "levelid": 30,
-                    "remark": "Dapat menyimpulkan materi ataupun program yang telah dibuat",
-                    "confidence": 0.9
-                  }
-                ]
-              }
-            ]
-          }       
+    "rubric": {
+      "criteria": [
+        {
+          "criterionid": 3,
+          "fillings": [
+            {
+              "criterionid": 3,
+              "levelid": 19,
+              "remark": "Penjelasan mengenai penggunaan modul sys, PyQt5, dan struktur kelas BarangApp dikemukakan dengan jelas dan dapat dimengerti. Penjelasan tentang logika validasi juga disajikan dengan baik.",  
+              "confidence": 0.9
+            }
+          ]
+        },
+        {
+          "criterionid": 6,
+          "fillings": [
+            {
+              "criterionid": 6,
+              "levelid": 18,
+              "remark": "Dari potongan kode dan deskripsi yang diberikan, penamaan variabel seperti `nama_barang`, `harga_barang`, `input_nama`, `selected_row`, dan `formatted_harga` informatif. Tidak ada indikasi program tidak efisien dari evidence yang tersedia.",
+              "confidence": 0.8
+            }
+          ]
+        },
+        {
+          "criterionid": 9,
+          "fillings": [
+            {
+              "criterionid": 9,
+              "levelid": 27,
+              "remark": "Terdapat bagian 'Pembahasan' yang menjelaskan fungsi kode per bagian berdasarkan nomor baris (misalnya '1-4', '6-10', '69-78'). Penjelasan ini sangat informatif dan mencakup bagian-bagian penting dari kode, memenuhi kriteria bahwa setiap baris code diberikan penjelasan dalam konteks blok logis.",
+              "confidence": 0.9
+            }
+          ]
+        },
+        {
+          "criterionid": 10,
+          "fillings": [
+            {
+              "criterionid": 10,
+              "levelid": 28,
+              "remark": "Tidak ditemukan bagian kesimpulan yang merangkum materi ataupun program yang telah dibuat oleh siswa. Terdapat bagian 'Saran' tetapi itu bukan kesimpulan dari hasil kerja.",
+              "confidence": 0.95
+            }
+          ]
+        }
+      ]
+    }       
         }  
     }    
 ]
@@ -192,7 +192,7 @@ def evaluate_full(pdf_path, predictions, rubric):
 
     pdf_text = extract_text_from_pdf(pdf_path)
     sentences = split_sentences(pdf_text)
-    embedder = SentenceTransformer("all-MiniLM-L6-v2")
+    embedder = SentenceTransformer("intfloat/multilingual-e5-large")
 
     results = []
     pred_scores = []
@@ -264,7 +264,7 @@ def evaluate_full(pdf_path, predictions, rubric):
 ###############################################
 # JALANKAN
 ###############################################
-pdf_path = "data\Laprak _Minggu 2 dan 3_Kelompok 6.pdf"
+pdf_path = "data\\_LP 12 & 13_Kelompok 6.docx.pdf"
 
 report = evaluate_full(pdf_path, predictions, rubric)
 

@@ -2,6 +2,7 @@ import argparse
 import json
 import sys
 import tempfile
+import hashlib
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import httpx
@@ -25,13 +26,17 @@ def process_grading(assignment_id: str, user_id: str, assignment_url: str, rubri
     file_url = _append_query_param(assignment_url, "token", token)
 
     # 1. Unduh PDF
+    doc_id = None
     try:
         with httpx.Client() as client:
             response = client.get(file_url, timeout=60)
             response.raise_for_status()
 
+            pdf_bytes = response.content
+            doc_id = hashlib.md5(pdf_bytes).hexdigest()
+
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
-                temp_pdf.write(response.content)
+                temp_pdf.write(pdf_bytes)
                 pdf_path = temp_pdf.name
 
     except Exception as e:
@@ -42,9 +47,16 @@ def process_grading(assignment_id: str, user_id: str, assignment_url: str, rubri
     if not extracted or not extracted.get("text", "").strip():
         return {"error": "Gagal membaca isi PDF / PDF kosong"}
 
+    if not doc_id:
+        return {"error": "Gagal menghasilkan doc_id dokumen"}
+
     # 3. Build RAG
     rag_engine = RAGEngine()
-    rag_engine.build_index(extracted["text"])
+    rag_engine.build_index(
+        text=extracted["text"],
+        doc_id=doc_id,
+        metadata={"filename": extracted.get("filename")},
+    )
 
     # 4. Grading
     grader = GradingEngine()
