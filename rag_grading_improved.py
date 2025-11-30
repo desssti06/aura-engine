@@ -30,8 +30,10 @@ class Config:
     # MODELS
     MODEL = os.getenv("MODEL")
     EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
+    MODEL_PROVIDER = (os.getenv("MODEL_PROVIDER") or "gemini").lower()
 
     # MOODLE TOKEN
+    MOODLE_BASE_URL = os.getenv("MOODLE_BASE_URL")
     MOODLE_TOKEN = os.getenv("MOODLE_TOKEN")
     MOODLE_DOWNLOAD_TOKEN = os.getenv("MOODLE_DOWNLOAD_TOKEN") or MOODLE_TOKEN
 
@@ -59,14 +61,29 @@ class Config:
         errors = []
 
         required_env = {
-            "GEMINI_API_KEY": cls.GEMINI_API_KEY,
-            "GEMINI_API_URL": cls.GEMINI_API_URL,
             "MODEL": cls.MODEL,
             "EMBEDDING_MODEL": cls.EMBEDDING_MODEL,
             "DATA_FOLDER": cls.DATA_FOLDER,
             "OUTPUT_FOLDER": cls.OUTPUT_FOLDER,
             "RUBRIC_FILE": cls.RUBRIC_FILE,
         }
+
+        provider_env = {}
+
+        if cls.MODEL_PROVIDER == "gemini":
+            provider_env = {
+                "GEMINI_API_KEY": cls.GEMINI_API_KEY,
+                "GEMINI_API_URL": cls.GEMINI_API_URL,
+            }
+        elif cls.MODEL_PROVIDER == "openrouter":
+            provider_env = {
+                "OPENROUTER_KEY": cls.OPENROUTER_KEY,
+                "OPENROUTER_URL": cls.OPENROUTER_URL,
+            }
+        else:
+            errors.append(f"❌ MODEL_PROVIDER tidak dikenali: {cls.MODEL_PROVIDER}")
+
+        required_env.update(provider_env)
 
         for key, value in required_env.items():
             if value is None:
@@ -82,6 +99,52 @@ class Config:
             errors.append("❌ CHUNK_OVERLAP tidak boleh lebih besar dari CHUNK_SIZE.")
 
         return errors
+
+    @classmethod
+    def apply_overrides(cls, integration_config: Optional[Dict]):
+        if not integration_config:
+            return
+
+        ai_cfg = integration_config.get("ai") or {}
+
+        service = ai_cfg.get("service")
+        if service:
+            cls.MODEL_PROVIDER = str(service).lower()
+
+        if ai_cfg.get("model"):
+            cls.MODEL = ai_cfg["model"]
+
+        temperature = ai_cfg.get("temperature")
+        if temperature is not None:
+            try:
+                cls.TEMPERATURE = float(temperature)
+            except (TypeError, ValueError):
+                logging.warning("Lewati temperature override tidak valid: %s", temperature)
+
+        provider = cls.MODEL_PROVIDER
+
+        if provider == "gemini":
+            if ai_cfg.get("api_key"):
+                cls.GEMINI_API_KEY = ai_cfg["api_key"]
+            if ai_cfg.get("api_base_url"):
+                cls.GEMINI_API_URL = ai_cfg["api_base_url"]
+        elif provider == "openrouter":
+            if ai_cfg.get("api_key"):
+                cls.OPENROUTER_KEY = ai_cfg["api_key"]
+            if ai_cfg.get("api_base_url"):
+                cls.OPENROUTER_URL = ai_cfg["api_base_url"]
+
+        moodle_cfg = integration_config.get("moodle") or {}
+        base_url = moodle_cfg.get("ws_base_url")
+        download_token = moodle_cfg.get("download_token")
+        ws_token = moodle_cfg.get("ws_token")
+
+        if base_url:
+            cls.MOODLE_BASE_URL = base_url
+        if ws_token:
+            cls.MOODLE_TOKEN = ws_token
+        if download_token or ws_token:
+            cls.MOODLE_DOWNLOAD_TOKEN = download_token or ws_token
 
 
 # ==========================================================
@@ -346,6 +409,43 @@ Kembalikan hanya JSON dengan struktur:
     # CALL LLM — ENV ONLY
     def _call_llm(self, prompt: str) -> str:
         try:
+            provider = Config.MODEL_PROVIDER
+
+            if provider == "openrouter":
+                if not Config.OPENROUTER_URL or not Config.OPENROUTER_KEY:
+                    raise ValueError("OpenRouter credentials are not configured")
+
+                headers = {
+                    "Authorization": f"Bearer {Config.OPENROUTER_KEY}",
+                    "Content-Type": "application/json",
+                }
+
+                payload = {
+                    "model": Config.MODEL,
+                    "messages": [
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": Config.TEMPERATURE,
+                }
+
+                resp = requests.post(Config.OPENROUTER_URL, json=payload, headers=headers, timeout=120)
+                resp.raise_for_status()
+
+                data = resp.json()
+                choices = data.get("choices")
+                if not choices:
+                    raise ValueError("OpenRouter response missing choices")
+
+                message = choices[0].get("message", {})
+                content = message.get("content")
+                if not content:
+                    raise ValueError("OpenRouter response missing content")
+
+                return content
+
+            if not Config.GEMINI_API_URL or not Config.GEMINI_API_KEY:
+                raise ValueError("Gemini credentials are not configured")
+
             headers = {"Content-Type": "application/json"}
 
             payload = {
@@ -360,8 +460,12 @@ Kembalikan hanya JSON dengan struktur:
             data = resp.json()
             return data["candidates"][0]["content"]["parts"][0]["text"]
 
+        except requests.HTTPError as http_err:
+            detail = http_err.response.text if http_err.response is not None else "<no response body>"
+            logging.error(f"❌ LLM ERROR ({Config.MODEL_PROVIDER}): {http_err} | response={detail}")
+            return "{}"
         except Exception as e:
-            logging.error(f"❌ LLM ERROR: {e}")
+            logging.error(f"❌ LLM ERROR ({Config.MODEL_PROVIDER}): {e}")
             return "{}"
 
     # PARSE JSON

@@ -3,7 +3,7 @@ import json
 import sys
 import tempfile
 import hashlib
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse, urljoin
 
 import httpx
 
@@ -18,7 +18,24 @@ def _append_query_param(url: str, key: str, value: str) -> str:
     return urlunparse(parsed._replace(query=new_query))
 
 
+def _resolve_submission_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme:
+        return url
+
+    base = Config.MOODLE_BASE_URL
+    if not base:
+        raise ValueError("Base URL Moodle tidak tersedia untuk membentuk submission_url absolut.")
+
+    return urljoin(base.rstrip("/") + "/", url.lstrip("/"))
+
+
 def process_grading(assignment_id: str, user_id: str, assignment_url: str, rubric_data: dict):
+    try:
+        assignment_url = _resolve_submission_url(assignment_url)
+    except Exception as e:
+        return {"error": f"Gagal menyiapkan URL submission: {e}"}
+
     token = Config.MOODLE_DOWNLOAD_TOKEN
     if not token:
         return {"error": "Environment variable MOODLE_DOWNLOAD_TOKEN is not set."}
@@ -98,6 +115,9 @@ if __name__ == "__main__":
     except Exception as e:
         print(json.dumps({"error": f"Gagal parsing input JSON: {e}"}))
         exit(1)
+
+    integration_config = data.get("integration_config") or {}
+    Config.apply_overrides(integration_config)
 
     # Ambil field (dukung camelCase maupun snake_case)
     user_id = data.get("userId") or data.get("user_id")
