@@ -1,6 +1,0 @@
-pandas 
-sentence-transformers 
-PyPDF2 
-requests
-ragas 
-datasets
