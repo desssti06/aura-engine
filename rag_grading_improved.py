@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import requests
-from chromadb import PersistentClient
+from chromadb import Client, PersistentClient
 from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from PyPDF2 import PdfReader
@@ -53,6 +53,7 @@ class Config:
     OUTPUT_FOLDER = os.getenv("OUTPUT_FOLDER")
     RUBRIC_FILE = os.getenv("RUBRIC_FILE")
     VECTOR_STORE_DIR = os.getenv("VECTOR_STORE_DIR", str(Path("vector_store").resolve()))
+    VECTOR_STORE_MODE = (os.getenv("VECTOR_STORE_MODE") or "disk").lower()
 
     MIN_CONFIDENCE_THRESHOLD = 0.6
 
@@ -84,6 +85,12 @@ class Config:
             errors.append(f"❌ MODEL_PROVIDER tidak dikenali: {cls.MODEL_PROVIDER}")
 
         required_env.update(provider_env)
+
+        if cls.VECTOR_STORE_MODE not in {"disk", "memory"}:
+            errors.append("❌ VECTOR_STORE_MODE harus 'disk' atau 'memory'.")
+
+        if cls.VECTOR_STORE_MODE == "disk" and not cls.VECTOR_STORE_DIR:
+            errors.append("❌ VECTOR_STORE_DIR wajib saat mode penyimpanan disk.")
 
         for key, value in required_env.items():
             if value is None:
@@ -145,6 +152,11 @@ class Config:
             cls.MOODLE_TOKEN = ws_token
         if download_token or ws_token:
             cls.MOODLE_DOWNLOAD_TOKEN = download_token or ws_token
+
+        rag_cfg = integration_config.get("rag") or {}
+        mode_override = rag_cfg.get("vector_store_mode")
+        if mode_override:
+            cls.VECTOR_STORE_MODE = str(mode_override).lower()
 
 
 # ==========================================================
@@ -235,10 +247,12 @@ def _classify_chunk(text: str) -> str:
 class RAGEngine:
     def __init__(self):
         self.embedder = SentenceTransformer(Config.EMBEDDING_MODEL)
-        persist_dir = Path(Config.VECTOR_STORE_DIR)
-        persist_dir.mkdir(parents=True, exist_ok=True)
-
-        self._client = PersistentClient(path=str(persist_dir))
+        if Config.VECTOR_STORE_MODE == "memory":
+            self._client = Client()
+        else:
+            persist_dir = Path(Config.VECTOR_STORE_DIR)
+            persist_dir.mkdir(parents=True, exist_ok=True)
+            self._client = PersistentClient(path=str(persist_dir))
         self._collection = self._client.get_or_create_collection(
             name="auto-grading-chunks",
             metadata={"source": "pdf-chunks"},
