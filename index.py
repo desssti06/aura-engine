@@ -7,7 +7,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse, urljoin
 
 import httpx
 
-from rag_grading_improved import PDFExtractor, RAGEngine, GradingEngine, Config
+from rag_grading import PDFExtractor, RAGEngine, GradingEngine, Config
 
 
 def _append_query_param(url: str, key: str, value: str) -> str:
